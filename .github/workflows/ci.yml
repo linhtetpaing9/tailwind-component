@@ -1,0 +1,99 @@
+name: CI
+
+on: pull_request
+
+env:
+  NODE_VERSION: 16
+
+jobs:
+  lint-commits:
+    name: Lint commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install modules
+        run: yarn --frozen-lockfile
+
+      - name: Lint
+        run: yarn commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  lint-code:
+    name: Lint code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install modules
+        run: yarn --frozen-lockfile
+
+      - name: Lint
+        run: yarn lint:code
+
+  lint-type:
+    name: Type checking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install modules
+        run: yarn --frozen-lockfile
+
+      - name: Run typescript check
+        run: yarn lint:type
+
+  test-build:
+    name: Build testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install modules
+        run: yarn --frozen-lockfile
+
+      - name: Build the app
+        run: yarn build
+
+  deploy-preview:
+    name: Deploy preview
+    needs: [lint-commits, lint-type, test-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Extract repo name
+        run: echo "REPO_NAME=$(echo '${{ github.repository }}' | sed -e 's/\//-/g')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Force Vercel-CLI version
+        run: yarn add -D vercel@27.0.0
+
+      - name: Vercel Action
+        uses: amondnet/vercel-action@v25
+        with:
+          alias-domains: pr-{{PR_NUMBER}}-${{ env.REPO_NAME }}.vercel.app
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_STAGING_PROJECT_ID }}
+          scope: ${{ secrets.VERCEL_ORG_ID }}

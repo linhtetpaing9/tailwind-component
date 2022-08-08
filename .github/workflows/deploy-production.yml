@@ -1,0 +1,36 @@
+name: Deploy - Production
+
+# Controls when the workflow will run
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag or SHA'
+        required: true
+
+jobs:
+  review:
+    name: Review info
+    runs-on: ubuntu-latest
+    steps:
+      - name: Target - ${{ github.event.inputs.tag }}
+        run: ''
+
+  deploy:
+    name: Deploy to Vercel
+    needs: [review]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Vercel Action
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PRODUCTION_PROJECT_ID }}
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-args: '--prod'
